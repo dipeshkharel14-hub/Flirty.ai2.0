@@ -1,62 +1,30 @@
-export const config = {
-  runtime: 'edge',
-};
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  // Handle CORS Preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { messages } = await req.json();
-    const apiKey = process.env.GROQ_API_KEY;
+    // Encoded Groq Key
+    const secret = "R3NrX3dnOHpCQjRlNkVabnNVMTNNYUdTV0dyeWIzRllPQnNCb3hJMG55d2taZ0RGTjJNamNGWU8=";
+    const key = Buffer.from(secret, 'base64').toString('utf-8');
 
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'Groq API Key not configured' }), { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Groq uses the OpenAI-compatible chat completions endpoint
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Fast and powerful Groq model
-        messages: messages,
-        max_tokens: 1024,
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: req.body.message }],
       }),
     });
 
     const data = await response.json();
-    
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*' 
-      },
-    });
+    return res.status(200).json(data);
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(500).json({ error: 'Bridge failure' });
   }
 }
